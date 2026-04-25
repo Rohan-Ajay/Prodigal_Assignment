@@ -266,10 +266,10 @@ class AgentTests(unittest.TestCase):
         lookup_response = MagicMock()
         lookup_response.read.return_value = json.dumps(
             {
-                "accountId": "ACC1001",
-                "fullName": "Nithin Jain",
+                "account_id": "ACC1001",
+                "full_name": "Nithin Jain",
                 "dob": "1990-05-14",
-                "aadhaarLast4": "4321",
+                "aadhaar_last4": "4321",
                 "pincode": "400001",
                 "balance": "1250.75",
             }
@@ -290,10 +290,13 @@ class AgentTests(unittest.TestCase):
         self.assertEqual("ACC1001", account.account_id)
 
         lookup_request = mock_urlopen.call_args_list[0][0][0]
+        self.assertEqual("POST", lookup_request.get_method())
         self.assertEqual(
-            "https://example.com/api/lookup-account?accountId=ACC1001",
+            "https://example.com/api/lookup-account",
             lookup_request.full_url,
         )
+        lookup_payload = json.loads(lookup_request.data.decode("utf-8"))
+        self.assertEqual({"account_id": "ACC1001"}, lookup_payload)
 
         result = api.process_payment(
             account_id="ACC1001",
@@ -314,14 +317,14 @@ class AgentTests(unittest.TestCase):
             payment_request.full_url,
         )
         payload = json.loads(payment_request.data.decode("utf-8"))
-        self.assertEqual("ACC1001", payload["accountId"])
-        self.assertEqual("100", payload["amount"])
-        self.assertEqual("CARD", payload["paymentMethod"]["type"])
+        self.assertEqual("ACC1001", payload["account_id"])
+        self.assertEqual(100.0, payload["amount"])
+        self.assertEqual("card", payload["payment_method"]["type"])
 
     @patch("payment_agent.api.urllib.request.urlopen")
     def test_http_adapter_handles_plain_text_http_errors(self, mock_urlopen: MagicMock) -> None:
         mock_urlopen.side_effect = HTTPError(
-            url="https://example.com/api/lookup-account?accountId=ACC1001",
+            url="https://example.com/api/lookup-account",
             code=404,
             msg="Not Found",
             hdrs=None,

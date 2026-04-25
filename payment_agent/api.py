@@ -164,12 +164,16 @@ class HttpPaymentAPI(BasePaymentAPI):
             raise PaymentAPIError("NETWORK_ERROR", "Payment service is currently unreachable.") from exc
 
     def lookup_account(self, account_id: str) -> AccountRecord:
-        payload = self._request(f"/api/lookup-account?accountId={account_id}")
+        payload = self._request(
+            "/api/lookup-account",
+            method="POST",
+            payload={"account_id": account_id},
+        )
         return AccountRecord(
-            account_id=payload["accountId"],
-            full_name=payload["fullName"],
+            account_id=payload["account_id"],
+            full_name=payload["full_name"],
             dob=payload["dob"],
-            aadhaar_last4=payload["aadhaarLast4"],
+            aadhaar_last4=payload["aadhaar_last4"],
             pincode=payload["pincode"],
             balance=Decimal(str(payload["balance"])),
         )
@@ -190,16 +194,16 @@ class HttpPaymentAPI(BasePaymentAPI):
             "/api/process-payment",
             method="POST",
             payload={
-                "accountId": account_id,
-                "amount": amount,
-                "paymentMethod": {
-                    "type": "CARD",
+                "account_id": account_id,
+                "amount": float(Decimal(amount)),
+                "payment_method": {
+                    "type": "card",
                     "card": {
-                        "cardholderName": cardholder_name,
-                        "cardNumber": card_number,
+                        "cardholder_name": cardholder_name,
+                        "card_number": card_number,
                         "cvv": cvv,
-                        "expiryMonth": expiry_month,
-                        "expiryYear": expiry_year,
+                        "expiry_month": expiry_month,
+                        "expiry_year": expiry_year,
                     },
                 },
             },
