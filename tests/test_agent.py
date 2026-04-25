@@ -1,6 +1,8 @@
 import json
 import unittest
 from datetime import date
+from io import BytesIO
+from urllib.error import HTTPError
 from unittest.mock import MagicMock, patch
 
 from agent import Agent
@@ -289,7 +291,7 @@ class AgentTests(unittest.TestCase):
 
         lookup_request = mock_urlopen.call_args_list[0][0][0]
         self.assertEqual(
-            "https://example.com/openapi/0/34/api/lookup-account?accountId=ACC1001",
+            "https://example.com/api/lookup-account?accountId=ACC1001",
             lookup_request.full_url,
         )
 
@@ -308,13 +310,30 @@ class AgentTests(unittest.TestCase):
         payment_request = mock_urlopen.call_args_list[1][0][0]
         self.assertEqual("POST", payment_request.get_method())
         self.assertEqual(
-            "https://example.com/openapi/0/34/api/process-payment",
+            "https://example.com/api/process-payment",
             payment_request.full_url,
         )
         payload = json.loads(payment_request.data.decode("utf-8"))
         self.assertEqual("ACC1001", payload["accountId"])
         self.assertEqual("100", payload["amount"])
         self.assertEqual("CARD", payload["paymentMethod"]["type"])
+
+    @patch("payment_agent.api.urllib.request.urlopen")
+    def test_http_adapter_handles_plain_text_http_errors(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = HTTPError(
+            url="https://example.com/api/lookup-account?accountId=ACC1001",
+            code=404,
+            msg="Not Found",
+            hdrs=None,
+            fp=BytesIO(b"NOT_FOUND"),
+        )
+
+        api = HttpPaymentAPI("https://example.com")
+        with self.assertRaises(PaymentAPIError) as ctx:
+            api.lookup_account("ACC1001")
+
+        self.assertEqual("API_ERROR", ctx.exception.code)
+        self.assertEqual("NOT_FOUND", ctx.exception.message)
 
 
 if __name__ == "__main__":

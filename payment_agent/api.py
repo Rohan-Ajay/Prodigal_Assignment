@@ -132,6 +132,15 @@ class HttpPaymentAPI(BasePaymentAPI):
     def __init__(self, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
 
+    def _parse_error_response(self, body: str) -> tuple[str, str]:
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            message = body.strip() or "API error"
+            return "API_ERROR", message
+
+        return payload.get("error_code", "API_ERROR"), payload.get("message", "API error")
+
     def _request(self, path: str, method: str = "GET", payload: Optional[dict] = None) -> dict:
         body = None
         headers = {}
@@ -149,13 +158,13 @@ class HttpPaymentAPI(BasePaymentAPI):
             with urllib.request.urlopen(request, timeout=20) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            payload = json.loads(exc.read().decode("utf-8"))
-            raise PaymentAPIError(payload.get("error_code", "API_ERROR"), payload.get("message", "API error")) from exc
+            code, message = self._parse_error_response(exc.read().decode("utf-8", errors="replace"))
+            raise PaymentAPIError(code, message) from exc
         except urllib.error.URLError as exc:
             raise PaymentAPIError("NETWORK_ERROR", "Payment service is currently unreachable.") from exc
 
     def lookup_account(self, account_id: str) -> AccountRecord:
-        payload = self._request(f"/openapi/0/34/api/lookup-account?accountId={account_id}")
+        payload = self._request(f"/api/lookup-account?accountId={account_id}")
         return AccountRecord(
             account_id=payload["accountId"],
             full_name=payload["fullName"],
@@ -178,7 +187,7 @@ class HttpPaymentAPI(BasePaymentAPI):
         today,
     ) -> Dict[str, object]:
         return self._request(
-            "/openapi/0/34/api/process-payment",
+            "/api/process-payment",
             method="POST",
             payload={
                 "accountId": account_id,
